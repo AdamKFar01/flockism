@@ -3,6 +3,7 @@ use macroquad::rand::gen_range;
 
 const NUM_FISH: usize = 100;
 const R_SEP: f32 = 24.0;
+const R_ALIGN: f32 = 50.0;
 const MAX_FORCE: f32 = 0.1;
 const MAX_SPEED: f32 = 3.0;
 
@@ -31,34 +32,59 @@ async fn main() {
         clear_background(Color::from_rgba(0x11, 0x11, 0x11, 0xFF));
 
         let positions: Vec<Vec2> = fishes.iter().map(|f| f.pos).collect();
+        let velocities: Vec<Vec2> = fishes.iter().map(|f| f.vel).collect();
 
         for (i, fish) in fishes.iter_mut().enumerate() {
-            let mut steer = Vec2::ZERO;
-            let mut count = 0;
+            let mut sep_steer = Vec2::ZERO;
+            let mut sep_count = 0;
 
-            for (j, &other_pos) in positions.iter().enumerate() {
+            let mut align_sum = Vec2::ZERO;
+            let mut align_count = 0;
+
+            for j in 0..positions.len() {
                 if i == j {
                     continue;
                 }
-                let diff = fish.pos - other_pos;
+                let diff = fish.pos - positions[j];
                 let dist = diff.length();
+
                 if dist > 0.0 && dist < R_SEP {
-                    steer += diff / (dist * dist);
-                    count += 1;
+                    sep_steer += diff / (dist * dist);
+                    sep_count += 1;
+                }
+                if dist > 0.0 && dist < R_ALIGN {
+                    align_sum += velocities[j];
+                    align_count += 1;
                 }
             }
 
-            if count > 0 {
-                steer /= count as f32;
-                if steer.length() > 0.0 {
-                    let desired = steer.normalize() * MAX_SPEED;
-                    let mut force = desired - fish.vel;
-                    if force.length() > MAX_FORCE {
-                        force = force.normalize() * MAX_FORCE;
+            // Separation: steer away from the average of nearby neighbor positions.
+            let mut separation_force = Vec2::ZERO;
+            if sep_count > 0 {
+                sep_steer /= sep_count as f32;
+                if sep_steer.length() > 0.0 {
+                    let desired = sep_steer.normalize() * MAX_SPEED;
+                    separation_force = desired - fish.vel;
+                    if separation_force.length() > MAX_FORCE {
+                        separation_force = separation_force.normalize() * MAX_FORCE;
                     }
-                    fish.vel += force;
                 }
             }
+
+            // Alignment: steer toward the average velocity of nearby neighbors.
+            let mut alignment_force = Vec2::ZERO;
+            if align_count > 0 {
+                let avg_vel = align_sum / align_count as f32;
+                if avg_vel.length() > 0.0 {
+                    let desired = avg_vel.normalize() * MAX_SPEED;
+                    alignment_force = desired - fish.vel;
+                    if alignment_force.length() > MAX_FORCE {
+                        alignment_force = alignment_force.normalize() * MAX_FORCE;
+                    }
+                }
+            }
+
+            fish.vel += separation_force + alignment_force;
 
             if fish.vel.length() > MAX_SPEED {
                 fish.vel = fish.vel.normalize() * MAX_SPEED;
