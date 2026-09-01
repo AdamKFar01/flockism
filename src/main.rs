@@ -4,6 +4,7 @@ use macroquad::rand::gen_range;
 const NUM_FISH: usize = 100;
 const R_SEP: f32 = 24.0;
 const R_ALIGN: f32 = 50.0;
+const R_COH: f32 = 60.0;
 const MAX_FORCE: f32 = 0.1;
 const MAX_SPEED: f32 = 3.0;
 
@@ -41,6 +42,9 @@ async fn main() {
             let mut align_sum = Vec2::ZERO;
             let mut align_count = 0;
 
+            let mut coh_sum = Vec2::ZERO;
+            let mut coh_count = 0;
+
             for j in 0..positions.len() {
                 if i == j {
                     continue;
@@ -55,6 +59,10 @@ async fn main() {
                 if dist > 0.0 && dist < R_ALIGN {
                     align_sum += velocities[j];
                     align_count += 1;
+                }
+                if dist > 0.0 && dist < R_COH {
+                    coh_sum += positions[j];
+                    coh_count += 1;
                 }
             }
 
@@ -84,7 +92,21 @@ async fn main() {
                 }
             }
 
-            fish.vel += separation_force + alignment_force;
+            // Cohesion: steer toward the average position (center of mass) of nearby neighbors.
+            let mut cohesion_force = Vec2::ZERO;
+            if coh_count > 0 {
+                let center = coh_sum / coh_count as f32;
+                let to_center = center - fish.pos;
+                if to_center.length() > 0.0 {
+                    let desired = to_center.normalize() * MAX_SPEED;
+                    cohesion_force = desired - fish.vel;
+                    if cohesion_force.length() > MAX_FORCE {
+                        cohesion_force = cohesion_force.normalize() * MAX_FORCE;
+                    }
+                }
+            }
+
+            fish.vel += separation_force + alignment_force + cohesion_force;
 
             if fish.vel.length() > MAX_SPEED {
                 fish.vel = fish.vel.normalize() * MAX_SPEED;
