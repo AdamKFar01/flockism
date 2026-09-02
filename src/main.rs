@@ -5,6 +5,8 @@ const NUM_FISH: usize = 100;
 const R_SEP: f32 = 24.0;
 const R_ALIGN: f32 = 50.0;
 const R_COH: f32 = 60.0;
+const R_PREDATOR: f32 = 80.0;
+const FLEE_MULTIPLIER: f32 = 3.0;
 const MAX_FORCE: f32 = 0.1;
 const MAX_SPEED: f32 = 3.0;
 
@@ -31,6 +33,8 @@ async fn main() {
 
     loop {
         clear_background(Color::from_rgba(0x11, 0x11, 0x11, 0xFF));
+
+        let shark_pos: Vec2 = mouse_position().into();
 
         let positions: Vec<Vec2> = fishes.iter().map(|f| f.pos).collect();
         let velocities: Vec<Vec2> = fishes.iter().map(|f| f.vel).collect();
@@ -106,7 +110,20 @@ async fn main() {
                 }
             }
 
-            fish.vel += separation_force + alignment_force + cohesion_force;
+            // Flee: strongly steer away from the shark when within predator range.
+            let mut flee_force = Vec2::ZERO;
+            let to_shark = fish.pos - shark_pos;
+            let shark_dist = to_shark.length();
+            if shark_dist > 0.0 && shark_dist < R_PREDATOR {
+                let desired = to_shark.normalize() * MAX_SPEED;
+                flee_force = desired - fish.vel;
+                if flee_force.length() > MAX_FORCE {
+                    flee_force = flee_force.normalize() * MAX_FORCE;
+                }
+                flee_force *= FLEE_MULTIPLIER;
+            }
+
+            fish.vel += separation_force + alignment_force + cohesion_force + flee_force;
 
             if fish.vel.length() > MAX_SPEED {
                 fish.vel = fish.vel.normalize() * MAX_SPEED;
@@ -137,6 +154,14 @@ async fn main() {
                 WHITE,
             );
         }
+
+        let shark_size = 18.0;
+        draw_triangle(
+            shark_pos + vec2(shark_size, 0.0),
+            shark_pos + vec2(-shark_size, shark_size * 0.6),
+            shark_pos + vec2(-shark_size, -shark_size * 0.6),
+            RED,
+        );
 
         next_frame().await;
     }
