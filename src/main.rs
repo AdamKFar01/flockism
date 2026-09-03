@@ -10,9 +10,23 @@ const FLEE_MULTIPLIER: f32 = 3.0;
 const MAX_FORCE: f32 = 0.1;
 const MAX_SPEED: f32 = 3.0;
 
+const SHARK_MAX_FORCE: f32 = 0.05;
+const SHARK_MAX_SPEED: f32 = 2.0;
+const SHARK_TARGET_RADIUS: f32 = 40.0;
+
 struct Fish {
     pos: Vec2,
     vel: Vec2,
+}
+
+struct Shark {
+    pos: Vec2,
+    vel: Vec2,
+    target: Vec2,
+}
+
+fn random_point() -> Vec2 {
+    vec2(gen_range(0.0, screen_width()), gen_range(0.0, screen_height()))
 }
 
 fn window_conf() -> Conf {
@@ -31,10 +45,47 @@ async fn main() {
         })
         .collect();
 
+    let mut shark = Shark {
+        pos: random_point(),
+        vel: Vec2::ZERO,
+        target: random_point(),
+    };
+
     loop {
         clear_background(Color::from_rgba(0x11, 0x11, 0x11, 0xFF));
 
-        let shark_pos: Vec2 = mouse_position().into();
+        // Shark wander: steer toward a target point, pick a new random target once close.
+        if (shark.target - shark.pos).length() < SHARK_TARGET_RADIUS {
+            shark.target = random_point();
+        }
+        let to_target = shark.target - shark.pos;
+        if to_target.length() > 0.0 {
+            let desired = to_target.normalize() * SHARK_MAX_SPEED;
+            let mut force = desired - shark.vel;
+            if force.length() > SHARK_MAX_FORCE {
+                force = force.normalize() * SHARK_MAX_FORCE;
+            }
+            shark.vel += force;
+        }
+        if shark.vel.length() > SHARK_MAX_SPEED {
+            shark.vel = shark.vel.normalize() * SHARK_MAX_SPEED;
+        }
+        shark.pos += shark.vel;
+
+        if shark.pos.x < 0.0 {
+            shark.pos.x += screen_width();
+        }
+        if shark.pos.x > screen_width() {
+            shark.pos.x -= screen_width();
+        }
+        if shark.pos.y < 0.0 {
+            shark.pos.y += screen_height();
+        }
+        if shark.pos.y > screen_height() {
+            shark.pos.y -= screen_height();
+        }
+
+        let shark_pos: Vec2 = shark.pos;
 
         let positions: Vec<Vec2> = fishes.iter().map(|f| f.pos).collect();
         let velocities: Vec<Vec2> = fishes.iter().map(|f| f.vel).collect();
