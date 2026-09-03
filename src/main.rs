@@ -29,6 +29,18 @@ fn random_point() -> Vec2 {
     vec2(gen_range(0.0, screen_width()), gen_range(0.0, screen_height()))
 }
 
+fn draw_boid(pos: Vec2, vel: Vec2, size: f32, color: Color) {
+    let angle = vel.y.atan2(vel.x);
+    let (sin, cos) = angle.sin_cos();
+    let rotate = |x: f32, y: f32| vec2(x * cos - y * sin, x * sin + y * cos);
+    draw_triangle(
+        pos + rotate(size, 0.0),
+        pos + rotate(-size, size * 0.6),
+        pos + rotate(-size, -size * 0.6),
+        color,
+    );
+}
+
 fn window_conf() -> Conf {
     Conf {
         window_title: "Flockism".to_owned(),
@@ -198,21 +210,10 @@ async fn main() {
 
         let size = 8.0;
         for fish in &fishes {
-            draw_triangle(
-                fish.pos + vec2(size, 0.0),
-                fish.pos + vec2(-size, size * 0.6),
-                fish.pos + vec2(-size, -size * 0.6),
-                WHITE,
-            );
+            draw_boid(fish.pos, fish.vel, size, WHITE);
         }
 
-        let shark_size = 18.0;
-        draw_triangle(
-            shark_pos + vec2(shark_size, 0.0),
-            shark_pos + vec2(-shark_size, shark_size * 0.6),
-            shark_pos + vec2(-shark_size, -shark_size * 0.6),
-            RED,
-        );
+        draw_boid(shark.pos, shark.vel, 18.0, RED);
 
         next_frame().await;
     }
