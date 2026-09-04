@@ -102,6 +102,13 @@ async fn main() {
         let positions: Vec<Vec2> = fishes.iter().map(|f| f.pos).collect();
         let velocities: Vec<Vec2> = fishes.iter().map(|f| f.vel).collect();
 
+        // Sum of each rule's steering magnitude across the whole flock this frame,
+        // used to report which rule is currently driving the flock's behavior most.
+        let mut total_separation = 0.0f32;
+        let mut total_alignment = 0.0f32;
+        let mut total_cohesion = 0.0f32;
+        let mut total_flee = 0.0f32;
+
         for (i, fish) in fishes.iter_mut().enumerate() {
             let mut sep_steer = Vec2::ZERO;
             let mut sep_count = 0;
@@ -186,6 +193,11 @@ async fn main() {
                 flee_force *= FLEE_MULTIPLIER;
             }
 
+            total_separation += separation_force.length();
+            total_alignment += alignment_force.length();
+            total_cohesion += cohesion_force.length();
+            total_flee += flee_force.length();
+
             fish.vel += separation_force + alignment_force + cohesion_force + flee_force;
 
             if fish.vel.length() > MAX_SPEED {
@@ -214,6 +226,19 @@ async fn main() {
         }
 
         draw_boid(shark.pos, shark.vel, 18.0, RED);
+
+        let dominant_rule = [
+            (total_separation, "Rule 1: Separation"),
+            (total_alignment, "Rule 2: Alignment"),
+            (total_cohesion, "Rule 3: Cohesion"),
+            (total_flee, "Rule 4: Flee -> Flash Expansion"),
+        ]
+        .into_iter()
+        .max_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, label)| label)
+        .unwrap_or("Rule 1: Separation");
+
+        draw_text(dominant_rule, 12.0, 24.0, 22.0, Color::from_rgba(0xC0, 0xC0, 0xC0, 0xFF));
 
         next_frame().await;
     }
