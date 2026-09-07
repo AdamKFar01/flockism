@@ -63,6 +63,12 @@ async fn main() {
         target: random_point(),
     };
 
+    // Hysteresis for the dominant-rule label: a challenger must beat the
+    // current label by this margin to take over, otherwise near-tied totals
+    // (Alignment vs. Cohesion in practice) flip the label every frame.
+    const DOMINANCE_MARGIN: f32 = 1.2;
+    let mut dominant_rule = "Rule 1: Separation";
+
     loop {
         clear_background(Color::from_rgba(0x11, 0x11, 0x11, 0xFF));
 
@@ -227,16 +233,27 @@ async fn main() {
 
         draw_boid(shark.pos, shark.vel, 18.0, RED);
 
-        let dominant_rule = [
+        let totals = [
             (total_separation, "Rule 1: Separation"),
             (total_alignment, "Rule 2: Alignment"),
             (total_cohesion, "Rule 3: Cohesion"),
             (total_flee, "Rule 4: Flee -> Flash Expansion"),
-        ]
-        .into_iter()
-        .max_by(|a, b| a.0.total_cmp(&b.0))
-        .map(|(_, label)| label)
-        .unwrap_or("Rule 1: Separation");
+        ];
+
+        let current_value = totals
+            .iter()
+            .find(|(_, label)| *label == dominant_rule)
+            .map(|(value, _)| *value)
+            .unwrap_or(0.0);
+
+        let (best_value, best_label) = totals
+            .into_iter()
+            .max_by(|a, b| a.0.total_cmp(&b.0))
+            .unwrap();
+
+        if best_label != dominant_rule && best_value > current_value * DOMINANCE_MARGIN {
+            dominant_rule = best_label;
+        }
 
         draw_text(dominant_rule, 12.0, 24.0, 22.0, Color::from_rgba(0xC0, 0xC0, 0xC0, 0xFF));
 
